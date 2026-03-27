@@ -1,0 +1,18 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Static Analysis & Linting
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+flake8.txt
+
+# OS specific
+.DS_Store
