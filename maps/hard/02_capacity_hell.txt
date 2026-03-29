@@ -2,7 +2,7 @@
 nb_drones: 12
 
 start_hub: start 0 0 [color=green max_drones=12]
-hub: gate1 1 0 [color=orange max_drones=1]
+hub: gate1 1 0 [colr=orange max_drones=1]
 hub: gate2 2 0 [color=orange max_drones=1]
 hub: gate3 3 0 [color=orange max_drones=1]
 hub: waiting_area1 1 1 [color=blue max_drones=4]
