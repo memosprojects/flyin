@@ -27,6 +27,8 @@ class MapParser:
             if line.startswith("connection:"):
                 self._process_line_con(line)
 
+        self._make_connections()
+
         return self._finalize_map()
 
     def _process_line(self, line: str):
@@ -131,3 +133,51 @@ class MapParser:
             "hubs": self.hubs,
             "connections": self.connections
             }
+
+    def _make_connections(self):
+        for conn in self.connections:
+            if conn.target not in conn.source.neighbors:
+                conn.source.neighbors.append(conn.target)
+            if conn.source not in conn.target.neighbors:
+                conn.target.neighbors.append(conn.source)
+
+
+if __name__ == "__main__":
+    # Test için bir harita dosyası yolu belirt (pathlib Path nesnesi)
+    # Örn: maps/test_map.txt
+    map_file = Path("maps/hard/03_ultimate_challenge.txt")
+
+    if not map_file.exists():
+        print(f"Hata: {map_file} bulunamadı. Lütfen geçerli bir dosya yolu verin.")
+    else:
+        parser = MapParser(map_file)
+
+        try:
+            # 1. Veriyi parse et
+            parsed_data = parser.parse()
+
+            # 2. Hub'lar arası komşuluk ilişkisini kur (Graph'ı tamamla)
+            parser._make_connections()
+
+            # --- Sonucları Basalım ---
+            print(f"{'='*10} MAP ANALYSIS: {map_file.name} {'='*10}")
+            print(f"Drone Count: {parsed_data['drone_count']}")
+            print(f"Total Hubs:  {len(parsed_data['hubs'])}")
+            print(f"Total Conns: {len(parsed_data['connections'])}\n")
+
+            print("--- HUB DETAILS ---")
+            for name, hub in parsed_data['hubs'].items():
+                # Hub bilgilerini ve komşularını yazdır
+                status = "START" if hub.is_start else "END" if hub.is_end else "NORMAL"
+                neighbor_names = [n.name for n in hub.neighbors]
+
+                print(f"[{status}] {name:10} | Type: {hub.zone_type.value:10} | "
+                      f"Cap: {hub.max_drones} | Neighbors: {neighbor_names}")
+
+            print("\n--- CONNECTION DETAILS ---")
+            for conn in parsed_data['connections']:
+                print(f"Link: {conn.source.name} <-> {conn.target.name} | "
+                      f"Link Cap: {conn.max_link_capacity}")
+
+        except Exception as e:
+            print(f"PARSING ERROR: {e}")

@@ -38,6 +38,7 @@ class Hub(BaseModel):
     color: Optional[str] = None
     is_start: bool = False
     is_end: bool = False
+    neighbors: list = []
 
     @field_validator("name")
     @classmethod
@@ -53,4 +54,3 @@ class Connection(BaseModel):
     source: Hub
     target: Hub
     max_link_capacity: int = Field(default=1, ge=1)
-

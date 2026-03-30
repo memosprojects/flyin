@@ -37,4 +37,3 @@ class MapFolderManager:
 if __name__ == "__main__":
     a = MapFolderManager()
     print(a.map_list)
-
