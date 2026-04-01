@@ -156,9 +156,6 @@ if __name__ == "__main__":
             # 1. Veriyi parse et
             parsed_data = parser.parse()
 
-            # 2. Hub'lar arası komşuluk ilişkisini kur (Graph'ı tamamla)
-            parser._make_connections()
-
             # --- Sonucları Basalım ---
             print(f"{'='*10} MAP ANALYSIS: {map_file.name} {'='*10}")
             print(f"Drone Count: {parsed_data['drone_count']}")
