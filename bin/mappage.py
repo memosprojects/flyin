@@ -14,6 +14,7 @@ class MapView(arcade.View):
         self.map_name = map_name
 
         self.ui = arcade.gui.UIManager()
+        self.background = arcade.load_texture("/home/mehdemir/Projects/Fly/uilibrary/background.jpeg")
         self.anchor = arcade.gui.UIAnchorLayout()
 
         self.parsed_data = None
@@ -27,7 +28,6 @@ class MapView(arcade.View):
         self.text_objects = {}
 
         self.load_textures()
-
 
     def load_textures(self):
         islandsheet = arcade.load_spritesheet("/home/mehdemir/Projects/Fly/uilibrary/Island.png")
@@ -45,8 +45,6 @@ class MapView(arcade.View):
         base_size = min(max(base_size, 28), 80)
 
         return base_size / self.island.width
-
-
 
     def get_hub_texture(self, hub):
         if hub.is_start:
@@ -167,13 +165,14 @@ class MapView(arcade.View):
     def build_hub_sprites(self):
             self.hub_sprites = arcade.SpriteList()
             self.hub_markers = arcade.SpriteList() 
+            self.hub_name_texts = []
 
             # Marker dokusunu oluştur (beyaz, üzerine renk binecek)
             marker_texture = arcade.make_circle_texture(30, arcade.color.WHITE)
 
             for name, hub in self.hubs.items():
                 x, y = self.hub_screen_positions[name]
-                
+
                 # 1. Hub Ölçek Çarpanı (Senin formülünle)
                 base_size = self.get_hub_display_size()
                 s = base_size / 35.0
@@ -193,18 +192,31 @@ class MapView(arcade.View):
                     marker_texture,
                     scale=(10 * s) / marker_texture.width 
                 )
-                
+
                 # Pozisyonu perspektife göre kaydır (Sağ üst çapraz)
                 # Kayma miktarını da 's' ile çarpıyoruz ki küçük hublarda top adanın dışına taşmasın
                 offset_val = 12 * s
                 marker_sprite.center_x = x + offset_val
                 marker_sprite.center_y = y + offset_val
-                
+
                 # Renk ve Stil
                 marker_sprite.color = self.get_hub_color(hub)
                 marker_sprite.alpha = 200 # Hafif şeffaflık derinlik katar
-                
+
                 self.hub_markers.append(marker_sprite)
+                name_text = arcade.Text(
+                    name.replace("_", " ").title(),
+                    x,
+                    y - (22 * s),
+                    arcade.color.WHITE,
+                    min(20, max(10, int(12 * s))),
+                    anchor_x="center",
+                    anchor_y="center",
+                    align="center",
+                    multiline=True,
+                    width=8
+                )
+                self.hub_name_texts.append(name_text)
 
     def compute_scale(self):
         if not self.hubs:
@@ -242,15 +254,26 @@ class MapView(arcade.View):
         return screen_x, screen_y
 
     def go_back(self, event):
-        from WelcomePage import WelcomeView
+        from welcomepage import WelcomeView
         self.window.show_view(WelcomeView())
 
     def on_draw(self):
-        self.clear(color=arcade.color.BLACK)
-
+        self.clear()
+        arcade.draw_texture_rect(
+            self.background,
+            arcade.rect.XYWH(
+                self.window.width / 2,
+                self.window.height / 2,
+                self.window.width,
+                self.window.height,
+            ),
+        )
         self.draw_header()
         self.draw_connections()
         self.draw_hubs()
+        for text in self.hub_name_texts:
+            text.draw()
+        self.ui.draw()
 
     def draw_header(self):
         for text in self.text_objects.values():
@@ -308,13 +331,13 @@ class MapView(arcade.View):
 
                 # 1. Gölge (Shadow) - Hafif kaydırılmış
                 arcade.draw_ellipse_filled(mid_x + (2 * s), mid_y - (2 * s), 14 * s, 10 * s, (0, 0, 0, 100))
-                
+
                 # 2. Dış Çerçeve
                 arcade.draw_ellipse_filled(mid_x, mid_y, 14 * s, 10 * s, arcade.color.DARK_BROWN)
-                
+
                 # 3. Ana Gövde
                 arcade.draw_ellipse_filled(mid_x, mid_y, 12 * s, 8.5 * s, arcade.color.GOLDEN_BROWN)
-                
+
                 # 4. Parlama (Highlight)
                 arcade.draw_ellipse_filled(mid_x, mid_y, 10 * s, 7 * s, arcade.color.GOLD)
 

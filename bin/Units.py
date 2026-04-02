@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator
+from dataclasses import dataclass, field
 
 
 class ZoneType(Enum):
@@ -58,3 +59,9 @@ class Connection(BaseModel):
     source: Hub
     target: Hub
     max_link_capacity: int = Field(default=1, ge=1)
+
+@dataclass
+class Drone:
+    drone_id: int
+    route: list[str] = field(default_factory=list)
+    current_turn: int = 0
