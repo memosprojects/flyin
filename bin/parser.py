@@ -95,6 +95,8 @@ class MapParser:
                     key = "zone_type"
                 if value.isdigit():
                     value = int(value)
+                elif isinstance(value, str):
+                    value = value.strip("'\"")
                 metadata[key] = value
         return metadata
 

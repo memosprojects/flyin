@@ -40,6 +40,10 @@ class Hub(BaseModel):
     is_end: bool = False
     neighbors: list = []
 
+    @property
+    def cost(self) -> int:
+        return self.zone_type.cost()
+
     @field_validator("name")
     @classmethod
     def check_name_format(cls, v: str) -> str:

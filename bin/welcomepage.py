@@ -9,6 +9,8 @@ from mappage import MapView
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 800
 SCREEN_TITLE = "Flyin - Welcome"
+KENNEY_FONT_PATH = ':resources:/fonts/ttf/Kenney/Kenney_Pixel.ttf'
+KENNEY_FONT_NAME = "Kenney Pixel"
 
 
 class UIAssets:
@@ -17,20 +19,20 @@ class UIAssets:
         )
         sheet = arcade.load_spritesheet(path_to_ui)
         self.textures = sheet.get_texture_grid(
-            size=(16, 16),
+            size=(32, 32),
             columns=13,
             count=91,
         )
 
-        uibattlepath = Path("../uilibrary/kenney_tiny-battle/Tilemap/tilemap_packed.png")
-        battlesheet = arcade.load_spritesheet(uibattlepath)
-        self.battletextures = battlesheet.get_texture_grid(
+        mapui = Path("/home/mehdemir/Projects/Fly/uilibrary/dungeon_tiles.png")
+        mapuisheet = arcade.load_spritesheet(mapui)
+        self.mapui = mapuisheet.get_texture_grid(
             size=(16, 16),
             columns=18,
             count=198,
         )
 
-    def get_window(self, col: int, row: int, border: int = 12) -> NinePatchTexture:
+    def get_window(self, col: int, row: int, border: int = 5) -> NinePatchTexture:
         texture = self.textures[row * 13 + col]
         return NinePatchTexture(
             left=border,
@@ -44,16 +46,16 @@ class UIAssets:
         return self.textures[row * 13 + col]
     
     def get_battletexture(self, col: int, row: int):
-        return self.textures[row * 13 + col]
+        return self.battletextures[row * 13 + col]
 
 
 class WelcomeView(UIView):
     def __init__(self):
         super().__init__()
-
+        arcade.load_font(KENNEY_FONT_PATH)
         self.ui_assets = UIAssets()
 
-        self.bg_panel = self.ui_assets.get_window(0, 6)
+        self.bg_panel = self.ui_assets.get_window(0, 0)
         self.header_panel = self.ui_assets.get_window(2, 0)
         self.button_tex = self.ui_assets.get_window(9, 1)
         self.button_hover = self.ui_assets.get_window(9, 1)
@@ -68,9 +70,10 @@ class WelcomeView(UIView):
 
         title_label = arcade.gui.UILabel(
             text="WELCOME, PLEASE CHOOSE THE MAP",
-            font_size=20,
-            text_color=arcade.color.WHITE,
-            bold=True,
+            font_name=KENNEY_FONT_NAME,
+            font_size=36,
+            text_color=arcade.color.COOL_BLACK,
+            bold=False,
         )
         self.v_box.add(title_label.with_padding(bottom=30, top=12))
 
@@ -86,8 +89,10 @@ class WelcomeView(UIView):
         if not map_dir:
             empty_label = arcade.gui.UILabel(
                 text="No maps found.",
-                font_size=16,
+                font_name=KENNEY_FONT_NAME,
+                font_size=36,
                 text_color=arcade.color.RED,
+                bold=False
             )
             self.v_box.add(empty_label)
         else:
@@ -108,8 +113,30 @@ class WelcomeView(UIView):
                     texture_hovered=hover_tex,
                     texture_pressed=pressed_tex,
                     text=map_name,
-                    width=240,
+                    width=360,
                     height=36,
+                    style={
+                            "normal": arcade.gui.UITextureButton.UIStyle(
+                                font_name=KENNEY_FONT_NAME,
+                                font_size=24,
+                                font_color=arcade.color.WHITE,
+                            ),
+                            "hover": arcade.gui.UITextureButton.UIStyle(
+                                font_name=KENNEY_FONT_NAME,
+                                font_size=24,
+                                font_color=arcade.color.WHITE,
+                            ),
+                            "press": arcade.gui.UITextureButton.UIStyle(
+                                font_name=KENNEY_FONT_NAME,
+                                font_size=24,
+                                font_color=arcade.color.BLACK,
+                            ),
+                            "disabled": arcade.gui.UITextureButton.UIStyle(
+                                font_name=KENNEY_FONT_NAME,
+                                font_size=24,
+                                font_color=arcade.color.GRAY,
+                            ),
+                        },
                 )
 
                 button.on_click = self.make_map_handler(map_name, map_path)
@@ -125,11 +152,7 @@ class WelcomeView(UIView):
     def make_map_handler(self, map_name, map_path):
         def on_click(event):
             self.selected_map_path = map_path
-            print(f"Selected map: {map_name}")
-            print(f"Map path: {map_path}")
-
-            # parser burada veya MapView içinde çalışabilir
-            map_view = MapView(map_path=map_path)
+            map_view = MapView(map_path=map_path,map_name=map_name)
             self.window.show_view(map_view)
 
         return on_click
@@ -173,11 +196,13 @@ class WelcomeView(UIView):
 
 
 def main():
-    window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+    
+    window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, fullscreen=True)
     welcome_view = WelcomeView()
     window.show_view(welcome_view)
     arcade.run()
 
 
 if __name__ == "__main__":
+    
     main()
