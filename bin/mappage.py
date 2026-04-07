@@ -142,7 +142,7 @@ class MapView(arcade.View):
         self.connections = self.parsed_data["connections"]
 
         planner = DronePlanner(self.parsed_data)
-        self.drones = planner.plan_all_drones(max_turns=200)
+        self.drones = planner.plan_all_drones()
         self.max_turn = self.get_finished_turn()
 
         self.start_hub = next(hub for hub in self.hubs.values() if hub.is_start)
@@ -182,6 +182,9 @@ class MapView(arcade.View):
             arcade.color.LIGHT_GRAY,
             14,
         )
+
+        self.text_objects["hub_capacity"] = []
+        self.text_objects["hub_zone"] = []
 
     def get_color_from_string(self, color_str: str):
         if not color_str:
@@ -285,6 +288,70 @@ class MapView(arcade.View):
         self.offset_x = (self.window.width - actual_map_w) / 2
         self.offset_y = (self.window.height - actual_map_h) / 2
 
+    def get_hub_capacity_labels(self, turn: int) -> dict[str, str]:
+        occupancy = {name: 0 for name in self.hubs}
+
+        for drone in self.drones:
+            state = self.get_drone_state_at_turn(drone, turn)
+
+            if "->" not in state:
+                occupancy[state] += 1
+
+        labels = {}
+
+        for name, hub in self.hubs.items():
+            current = occupancy[name]
+
+            if current == 0:
+                continue
+
+            if hub.is_start or hub.is_end:
+                labels[name] = f"{current}/∞"
+            else:
+                labels[name] = f"{current}/{hub.max_drones}"
+
+        return labels
+
+    def update_hub_capacity_texts(self):
+        self.text_objects["hub_capacity"] = []
+        self.text_objects["hub_zone"] = []
+
+        labels = self.get_hub_capacity_labels(self.current_turn)
+        base_size = self.get_hub_display_size()
+        s = base_size / 35.0
+
+        for name, hub in self.hubs.items():
+            x, y = self.hub_screen_positions[name]
+
+            # --- CAPACITY (sol üst) ---
+            if name in labels:
+                capacity_label = arcade.Text(
+                    labels[name],
+                    x - (18 * s),
+                    y + (18 * s),
+                    arcade.color.WHITE,
+                    font_size=min(16, max(10, int(10 * s))),
+                    anchor_x="right",
+                    anchor_y="bottom",
+                    bold=True,
+                )
+                self.text_objects["hub_capacity"].append(capacity_label)
+
+            # --- ZONE TYPE (sağ üst) ---
+            zone_text = str(hub.zone_type).split(".")[-1].upper()
+
+            zone_label = arcade.Text(
+                zone_text,
+                x + (18 * s),
+                y + (18 * s),
+                arcade.color.LIGHT_GRAY,
+                font_size=min(14, max(8, int(9 * s))),
+                anchor_x="left",
+                anchor_y="bottom",
+            )
+
+            self.text_objects["hub_zone"].append(zone_label)
+
     def transform_position(self, x, y):
         screen_x = self.offset_x + (int(x) - self.min_x) * self.scale
         screen_y = self.offset_y + (int(y) - self.min_y) * self.scale
@@ -318,8 +385,14 @@ class MapView(arcade.View):
         self.ui.draw()
 
     def draw_header(self):
-        for text in self.text_objects.values():
-            text.draw()
+        for key in ("map", "drones", "stats"):
+            self.text_objects[key].draw()
+
+        for label in self.text_objects["hub_capacity"]:
+            label.draw()
+
+        for label in self.text_objects["hub_zone"]:
+            label.draw()
 
     def get_hub_display_size(self):
         hub_count = len(self.hubs)
@@ -419,6 +492,7 @@ class MapView(arcade.View):
 
             self.update_drone_positions_static()
             self.refresh_turn_label()
+            self.update_hub_capacity_texts()
             return
 
         self.update_drone_positions_for_animation()
