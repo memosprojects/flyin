@@ -1,6 +1,6 @@
 from pathlib import Path
-from pydantic import BaseModel, Field, field_validator
 from Units import Hub, Connection
+from typing import Any
 
 
 class MapParser:
@@ -10,12 +10,13 @@ class MapParser:
         self.connections: list = []
         self.drone_count: int = 0
 
-    def parse(self):
+    def parse(self) -> dict[str, Any]:
         with open(self.file_path, "r") as file:
             lines = [
-                ln.strip() for ln in file
+                ln.strip()
+                for ln in file
                 if ln.strip() and not ln.startswith("#")
-                ]
+            ]
 
         for line in lines:
             if line.startswith(("hub:", "start_hub:", "end_hub:")):
@@ -31,7 +32,7 @@ class MapParser:
 
         return self._finalize_map()
 
-    def _process_line(self, line: str):
+    def _process_line(self, line: str) -> None:
         data = self._hub_data_extractor(line)
         h_type = data.pop("type")
         hub = Hub(
@@ -41,7 +42,7 @@ class MapParser:
         )
         self.hubs[hub.name] = hub
 
-    def _process_line_con(self, line: str):
+    def _process_line_con(self, line: str) -> None:
         data = self._con_data_extractor(line)
 
         try:
@@ -122,7 +123,7 @@ class MapParser:
             "max_link_capacity": metadata.get("max_link_capacity", 1)
         }
 
-    def _finalize_map(self):
+    def _finalize_map(self) -> dict:
         # En az bir start ve bir end hub var mı?
         starts = [h for h in self.hubs.values() if h.is_start]
         ends = [h for h in self.hubs.values() if h.is_end]
@@ -136,47 +137,9 @@ class MapParser:
             "connections": self.connections
             }
 
-    def _make_connections(self):
+    def _make_connections(self) -> None:
         for conn in self.connections:
             if conn.target not in conn.source.neighbors:
                 conn.source.neighbors.append(conn.target)
             if conn.source not in conn.target.neighbors:
                 conn.target.neighbors.append(conn.source)
-
-
-if __name__ == "__main__":
-    # Test için bir harita dosyası yolu belirt (pathlib Path nesnesi)
-    # Örn: maps/test_map.txt
-    map_file = Path("maps/hard/03_ultimate_challenge.txt")
-
-    if not map_file.exists():
-        print(f"Hata: {map_file} bulunamadı. Lütfen geçerli bir dosya yolu verin.")
-    else:
-        parser = MapParser(map_file)
-
-        try:
-            # 1. Veriyi parse et
-            parsed_data = parser.parse()
-
-            # --- Sonucları Basalım ---
-            print(f"{'='*10} MAP ANALYSIS: {map_file.name} {'='*10}")
-            print(f"Drone Count: {parsed_data['drone_count']}")
-            print(f"Total Hubs:  {len(parsed_data['hubs'])}")
-            print(f"Total Conns: {len(parsed_data['connections'])}\n")
-
-            print("--- HUB DETAILS ---")
-            for name, hub in parsed_data['hubs'].items():
-                # Hub bilgilerini ve komşularını yazdır
-                status = "START" if hub.is_start else "END" if hub.is_end else "NORMAL"
-                neighbor_names = [n.name for n in hub.neighbors]
-
-                print(f"[{status}] {name:10} | Type: {hub.zone_type.value:10} | "
-                      f"Cap: {hub.max_drones} | Neighbors: {neighbor_names}")
-
-            print("\n--- CONNECTION DETAILS ---")
-            for conn in parsed_data['connections']:
-                print(f"Link: {conn.source.name} <-> {conn.target.name} | "
-                      f"Link Cap: {conn.max_link_capacity}")
-
-        except Exception as e:
-            print(f"PARSING ERROR: {e}")

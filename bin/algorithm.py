@@ -1,11 +1,7 @@
 from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any
-
-from Units import Connection, Drone, Hub
-from parser import MapParser
-from dataclasses import dataclass
+from Units import Drone, Hub, Connection
 
 
 @dataclass
@@ -15,24 +11,31 @@ class PlanResult:
     total_cost: int
 
 
+# Type aliases for readability
+State = tuple[str, int, str | None]
+Move = tuple[str, str, int, int]
+
+
 class DronePlanner:
-    def __init__(self, parsed_data: dict):
+    def __init__(self, parsed_data: dict[str, Any]):
         self.parsed_data = parsed_data
 
-        self.drone_count = parsed_data["drone_count"]
-        self.hubs = parsed_data["hubs"]
-        self.connections = parsed_data["connections"]
+        self.drone_count: int = parsed_data["drone_count"]
+        self.hubs: dict[str, Hub] = parsed_data["hubs"]
+        self.connections: list[Connection] = parsed_data["connections"]
 
-        self.start_hub = self._find_start_hub()
-        self.end_hub = self._find_end_hub()
+        self.start_hub: Hub = self._find_start_hub()
+        self.end_hub: Hub = self._find_end_hub()
 
-        self.connection_map = self._build_connection_map()
+        self.connection_map: dict[
+            tuple[str, str], Connection
+            ] = self._build_connection_map()
 
-        self.hub_usage = {}
-        self.edge_usage = {}
+        self.hub_usage: dict[int, dict[str, int]] = {}
+        self.edge_usage: dict[int, dict[tuple[str, str], int]] = {}
 
-        self.drones = self._create_drones()
-        self.debug = True
+        self.drones: list[Drone] = self._create_drones()
+        self.debug: bool = True
 
     def _find_start_hub(self) -> Hub:
         for hub in self.hubs.values():
@@ -46,16 +49,16 @@ class DronePlanner:
                 return hub
         raise ValueError("End hub not found.")
 
-    def _build_connection_map(self) -> dict:
-        connection_map = {}
+    def _build_connection_map(self) -> dict[tuple[str, str], Connection]:
+        connection_map: dict[tuple[str, str], Connection] = {}
 
         for conn in self.connections:
             connection_map[conn.edge_id] = conn
 
         return connection_map
 
-    def _create_drones(self) -> list:
-        drones = []
+    def _create_drones(self) -> list[Drone]:
+        drones: list[Drone] = []
 
         for drone_id in range(1, self.drone_count + 1):
             drone = Drone(drone_id=drone_id)
@@ -65,8 +68,8 @@ class DronePlanner:
 
         return drones
 
-    def _get_connection(self, a: str, b: str):
-        edge_id = tuple(sorted((a, b)))
+    def _get_connection(self, a: str, b: str) -> Connection:
+        edge_id: tuple[str, str] = tuple(sorted((a, b)))  # type: ignore
 
         if edge_id not in self.connection_map:
             raise ValueError(f"Connection not found between {a} and {b}.")
@@ -79,7 +82,7 @@ class DronePlanner:
         if hub.is_start or hub.is_end:
             return True
 
-        used = self.hub_usage.get(turn, {}).get(hub_name, 0)
+        used: int = self.hub_usage.get(turn, {}).get(hub_name, 0)
         return used < hub.max_drones
 
     def _can_wait(self, hub_name: str, next_turn: int) -> bool:
@@ -96,7 +99,7 @@ class DronePlanner:
         edge_id = conn.edge_id
 
         for used_turn in range(start_turn + 1, start_turn + duration + 1):
-            used = self.edge_usage.get(used_turn, {}).get(edge_id, 0)
+            used: int = self.edge_usage.get(used_turn, {}).get(edge_id, 0)
 
             if used >= conn.max_link_capacity:
                 return False
@@ -135,8 +138,8 @@ class DronePlanner:
         hub_name: str,
         current_turn: int,
         previous_hub: str | None,
-    ):
-        neighbors = []
+    ) -> list[tuple[int, int, State, list[str], Move | None]]:
+        neighbors: list[tuple[int, int, State, list[str], Move | None]] = []
 
         next_turn = current_turn + 1
         if self._can_wait(hub_name, next_turn):
@@ -175,14 +178,14 @@ class DronePlanner:
             else:
                 segment = [f"{hub_name}->{neighbor.name}", neighbor.name]
 
-            move_record = (
+            move_record: Move = (
                 hub_name,
                 neighbor.name,
                 current_turn,
                 duration,
             )
 
-            next_state = (
+            next_state: State = (
                 neighbor.name,
                 arrival_turn,
                 hub_name,
@@ -207,22 +210,23 @@ class DronePlanner:
         previous_hub: str | None,
         target_hub_name: str,
     ) -> PlanResult:
-        start_state = (start_hub_name, start_turn, previous_hub)
+        start_state: State = (start_hub_name, start_turn, previous_hub)
 
-        open_states = [start_state]
-        best_score = {start_state: (0, 0)}
-        priority_count = {start_state: 0}
+        open_states: list[State] = [start_state]
+        best_score: dict[State, tuple[int, int]] = {start_state: (0, 0)}
+        priority_count: dict[State, int] = {start_state: 0}
 
-        parent = {}
-        segment_map = {}
-        move_map = {}
+        parent: dict[State, State] = {}
+        segment_map: dict[State, list[str]] = {}
+        move_map: dict[State, Move | None] = {}
 
         while open_states:
-            current_state = min(open_states, key=lambda state: best_score[state])
+            current_state = min(open_states,
+                                key=lambda state: best_score[state])
             open_states.remove(current_state)
 
             hub_name, current_turn, prev_hub = current_state
-            current_cost, current_neg_priority = best_score[current_state]
+            current_cost, _ = best_score[current_state]
             current_priority_visits = priority_count[current_state]
 
             if hub_name == target_hub_name:
@@ -240,9 +244,9 @@ class DronePlanner:
                 prev_hub,
             )
 
-            for move_cost, priority_gain, next_state, segment, move_record in neighbors:
-                next_total_cost = current_cost + move_cost
-                next_priority_visits = current_priority_visits + priority_gain
+            for mv_cst, prio_gain, next_state, segment, mv_record in neighbors:
+                next_total_cost = current_cost + mv_cst
+                next_priority_visits = current_priority_visits + prio_gain
                 next_score = (next_total_cost, -next_priority_visits)
 
                 current_best = best_score.get(next_state)
@@ -253,7 +257,7 @@ class DronePlanner:
                 priority_count[next_state] = next_priority_visits
                 parent[next_state] = current_state
                 segment_map[next_state] = segment
-                move_map[next_state] = move_record
+                move_map[next_state] = mv_record
 
                 if next_state not in open_states:
                     open_states.append(next_state)
@@ -262,16 +266,16 @@ class DronePlanner:
 
     def _reconstruct_plan(
         self,
-        end_state,
-        total_cost,
-        parent,
-        segment_map,
-        move_map,
-    ):
-        segments = []
-        moves = []
+        end_state: State,
+        total_cost: int,
+        parent: dict[State, State],
+        segment_map: dict[State, list[str]],
+        move_map: dict[State, Move | None],
+    ) -> PlanResult:
+        segments: list[list[str]] = []
+        moves: list[Move] = []
 
-        current_state = end_state
+        current_state: State | None = end_state
 
         while current_state in parent:
             segments.append(segment_map[current_state])
@@ -282,9 +286,9 @@ class DronePlanner:
 
             current_state = parent[current_state]
 
-        start_hub_name, _start_turn, _prev_hub = current_state
+        start_hub_name = current_state[0] if current_state else ""
 
-        timeline = [start_hub_name]
+        timeline: list[str] = [start_hub_name]
 
         for segment in reversed(segments):
             timeline.extend(segment)
@@ -297,7 +301,7 @@ class DronePlanner:
             total_cost=total_cost,
         )
 
-    def _reserve_plan(self, plan: PlanResult):
+    def _reserve_plan(self, plan: PlanResult) -> None:
         for turn, state in enumerate(plan.timeline):
             if "->" in state:
                 continue
@@ -344,37 +348,38 @@ class DronePlanner:
             self._reserve_plan(plan)
 
         return self.drones
-    
-    def print_solution(self) -> None:
+
+    def print_simulation(self) -> None:
         if not self.drones:
-            print("No drones planned.")
             return
 
+        active_drones = {drone.drone_id: drone for drone in self.drones}
         max_len = max(len(drone.route) for drone in self.drones)
 
-        print("=== SOLUTION ===")
-        print()
+        for turn in range(1, max_len):
+            movements = []
+            delivered_this_turn = []
 
-        for drone in self.drones:
-            route_text = " | ".join(drone.route)
-            print(f"Drone {drone.drone_id}: {route_text}")
+            for drone_id, drone in list(active_drones.items()):
+                if turn >= len(drone.route):
+                    continue
 
-        print()
-        print("=== TURN BY TURN ===")
-        print()
+                previous_state = drone.route[turn - 1]
+                current_state = drone.route[turn]
 
-        for turn in range(max_len):
-            print(f"TURN {turn}")
-            for drone in self.drones:
-                if turn < len(drone.route):
-                    print(f"  Drone {drone.drone_id}: {drone.route[turn]}")
-            print()
+                if current_state == previous_state:
+                    continue
 
+                movements.append(f"D{drone.drone_id}-{current_state}")
 
-if __name__ == "__main__":
-    parser = MapParser("/home/mehdemir/Projects/Fly/maps/challenger/01_the_impossible_dream.txt")
-    parsed_data = parser.parse()
-    planner = DronePlanner(parsed_data)
-    planner.plan_all_drones()
-    planner.print_solution()
+                if current_state == self.end_hub.name:
+                    delivered_this_turn.append(drone_id)
 
+            if movements:
+                print(" ".join(movements))
+
+            for drone_id in delivered_this_turn:
+                del active_drones[drone_id]
+
+            if not active_drones:
+                break

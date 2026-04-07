@@ -31,7 +31,8 @@ class MapFolderManager:
         for i in map_list:
             splitted = i.stem.split("_", 1)
             map_dict[i.name] = {
-                "name": splitted[1].replace("_", " ").title(), #will give an error if there is no _ in the name
+                "name": splitted[1].replace("_", " ").title(),
+                # will error if no _ exists
                 "category": i.parent.name,
                 "number": splitted[0],
                 "address": i
