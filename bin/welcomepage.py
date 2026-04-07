@@ -15,8 +15,16 @@ KENNEY_FONT_NAME = "Kenney Pixel"
 
 class UIAssets:
     def __init__(self):
-        path_to_ui = ("/home/mehdemir/Projects/Fly/uilibrary/kenney_ui-pack-pixel-adventure/Tilesheets/Large tiles/Thick outline/tilemap_packed.png"
-        )
+        path_to_ui = (
+            Path(__file__).parent
+            / ".."
+            / "uilibrary"
+            / "kenney_ui-pack-pixel-adventure"
+            / "Tilesheets"
+            / "Large tiles"
+            / "Thick outline"
+            / "tilemap_packed.png"
+        ).resolve()
         sheet = arcade.load_spritesheet(path_to_ui)
         self.textures = sheet.get_texture_grid(
             size=(32, 32),
@@ -24,7 +32,12 @@ class UIAssets:
             count=91,
         )
 
-        mapui = Path("/home/mehdemir/Projects/Fly/uilibrary/dungeon_tiles.png")
+        mapui = (
+            Path(__file__).parent
+            / ".."
+            / "uilibrary"
+            / "dungeon_tiles.png"
+        ).resolve()
         mapuisheet = arcade.load_spritesheet(mapui)
         self.mapui = mapuisheet.get_texture_grid(
             size=(16, 16),
@@ -44,7 +57,7 @@ class UIAssets:
 
     def get_texture(self, col: int, row: int):
         return self.textures[row * 13 + col]
-    
+
     def get_battletexture(self, col: int, row: int):
         return self.battletextures[row * 13 + col]
 
@@ -116,27 +129,27 @@ class WelcomeView(UIView):
                     width=360,
                     height=36,
                     style={
-                            "normal": arcade.gui.UITextureButton.UIStyle(
-                                font_name=KENNEY_FONT_NAME,
-                                font_size=24,
-                                font_color=arcade.color.WHITE,
-                            ),
-                            "hover": arcade.gui.UITextureButton.UIStyle(
-                                font_name=KENNEY_FONT_NAME,
-                                font_size=24,
-                                font_color=arcade.color.WHITE,
-                            ),
-                            "press": arcade.gui.UITextureButton.UIStyle(
-                                font_name=KENNEY_FONT_NAME,
-                                font_size=24,
-                                font_color=arcade.color.BLACK,
-                            ),
-                            "disabled": arcade.gui.UITextureButton.UIStyle(
-                                font_name=KENNEY_FONT_NAME,
-                                font_size=24,
-                                font_color=arcade.color.GRAY,
-                            ),
-                        },
+                        "normal": arcade.gui.UITextureButton.UIStyle(
+                            font_name=KENNEY_FONT_NAME,
+                            font_size=24,
+                            font_color=arcade.color.WHITE,
+                        ),
+                        "hover": arcade.gui.UITextureButton.UIStyle(
+                            font_name=KENNEY_FONT_NAME,
+                            font_size=24,
+                            font_color=arcade.color.WHITE,
+                        ),
+                        "press": arcade.gui.UITextureButton.UIStyle(
+                            font_name=KENNEY_FONT_NAME,
+                            font_size=24,
+                            font_color=arcade.color.BLACK,
+                        ),
+                        "disabled": arcade.gui.UITextureButton.UIStyle(
+                            font_name=KENNEY_FONT_NAME,
+                            font_size=24,
+                            font_color=arcade.color.GRAY,
+                        ),
+                    },
                 )
 
                 button.on_click = self.make_map_handler(map_name, map_path)
@@ -149,10 +162,24 @@ class WelcomeView(UIView):
             align_y=0
         )
 
+        quit_button = arcade.gui.UIFlatButton(
+            text="Quit",
+            width=120,
+        )
+        quit_button.on_click = self.quit_game
+
+        self.anchor.add(
+            child=quit_button,
+            anchor_x="right",
+            anchor_y="top",
+            align_x=-20,
+            align_y=-20,
+        )
+
     def make_map_handler(self, map_name, map_path):
         def on_click(event):
             self.selected_map_path = map_path
-            map_view = MapView(map_path=map_path,map_name=map_name)
+            map_view = MapView(map_path=map_path, map_name=map_name)
             self.window.show_view(map_view)
 
         return on_click
@@ -181,6 +208,9 @@ class WelcomeView(UIView):
             self.ui_assets.get_window(7, 2, border=6),
             self.ui_assets.get_window(9, 2, border=6),
         )
+
+    def quit_game(self, event):
+        arcade.exit()
 
     def on_draw_before_ui(self):
         self.clear()

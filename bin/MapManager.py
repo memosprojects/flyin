@@ -13,7 +13,11 @@ class MapFolderManager:
             raise FileNotFoundError(e)
 
     def get_all_maps(self) -> list:
-        maps = Path("/home/mehdemir/Projects/Fly/maps").rglob("*.txt")
+        maps = (
+            Path(__file__).parent
+            / ".."
+            / "maps"
+        ).resolve().rglob("*.txt")
         map_list = sorted(list(maps))
 
         if not map_list:
