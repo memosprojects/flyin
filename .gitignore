@@ -6,13 +6,37 @@ env/
 # Python Cache
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
 *$py.class
 
-# Static Analysis & Linting
+# Static Analysis & Testing
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
 flake8.txt
+
+# Build / Distribution
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Environment / Secrets
+.env
+.env.*
+
+# Logs & temp files
+*.log
+*.tmp
+*.swp
+
+# IDE
+.vscode/
+.idea/
 
 # OS specific
 .DS_Store

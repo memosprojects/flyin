@@ -10,7 +10,19 @@ from Units import Drone, Hub, Connection
 
 
 class MapView(arcade.View):
+    '''Render and animate a parsed drone map in an Arcade view.
+
+    This view is responsible for loading parsed map data, building UI
+    controls, rendering hubs and connections, and animating drone
+    movements turn by turn.
+    '''
     def __init__(self, map_path: str, map_name: str) -> None:
+        '''Initialize the map view and its UI, rendering, and animation state.
+
+        Args:
+            map_path (str): Path to the selected map file.
+            map_name (str): Display name of the selected map.
+        '''
         super().__init__()
 
         self.map_path: Path = Path(map_path)
@@ -21,7 +33,7 @@ class MapView(arcade.View):
             Path(__file__).parent
             / ".."
             / "uilibrary"
-            / "background.jpeg"
+            / "background2.jpg"
         )
         self.anchor: arcade.gui.UIAnchorLayout = arcade.gui.UIAnchorLayout()
 
@@ -49,6 +61,8 @@ class MapView(arcade.View):
         self.drone_sprites: arcade.SpriteList = arcade.SpriteList()
         self.drone_sprite_map: Dict[int, arcade.Sprite] = {}
         self.turn_label: Optional[arcade.gui.UILabel] = None
+        self.play_button: Optional[arcade.gui.UIFlatButton] = None
+        self.autoplay_enabled: bool = False
 
         self.max_turn: int = self.get_finished_turn()
 
@@ -64,8 +78,15 @@ class MapView(arcade.View):
         self.hub_sprites: arcade.SpriteList = arcade.SpriteList()
         self.hub_markers: arcade.SpriteList = arcade.SpriteList()
         self.hub_name_texts: List[arcade.Text] = []
+        self.show_hub_names: bool = True
+        self.name_toggle_button: Optional[arcade.gui.UIFlatButton] = None
 
     def load_textures(self) -> None:
+        '''Load texture assets used to render hubs on the map.
+
+        Returns:
+            None
+        '''
         islandsheet = arcade.load_spritesheet(
             Path(__file__).parent
             / ".."
@@ -78,9 +99,19 @@ class MapView(arcade.View):
         )
 
     def get_hub_scale(self) -> float:
+        '''Return the scale factor used for hub island sprites.
+
+        Returns:
+            float: Sprite scale based on current hub display size.
+        '''
         return self.get_hub_display_size() / self.island.width
 
     def on_show_view(self) -> None:
+        '''Build the view UI, load the map, and prepare visible labels.
+
+        Returns:
+            None
+        '''
         self.ui.enable()
         self.ui.add(self.anchor)
 
@@ -88,21 +119,54 @@ class MapView(arcade.View):
             text="Back",
             width=120,
         )
-        back_button.on_click = self.go_back  # type: ignore[method-assign]
+
+        @back_button.event("on_click")
+        def on_click_back(event: arcade.gui.UIOnClickEvent) -> None:
+            self.go_back(event)
 
         next_button = arcade.gui.UIFlatButton(
             text="Next Turn",
             width=140,
         )
-        next_button.on_click = self.on_next_turn  # type: ignore[method-assign]
+
+        @next_button.event("on_click")
+        def on_click_next(event: arcade.gui.UIOnClickEvent) -> None:
+            self.on_next_turn(event)
+
+        self.play_button = arcade.gui.UIFlatButton(
+            text="Play",
+            width=120,
+        )
+
+        @self.play_button.event("on_click")
+        def on_click_play(event: arcade.gui.UIOnClickEvent) -> None:
+            self.toggle_autoplay(event)
 
         quit_button = arcade.gui.UIFlatButton(
             text="Quit",
             width=120,
         )
-        quit_button.on_click = self.quit_game  # type: ignore[method-assign]
 
-        self.load_map()
+        @quit_button.event("on_click")
+        def on_click_quit(event: arcade.gui.UIOnClickEvent) -> None:
+            self.quit_game(event)
+
+        self.name_toggle_button = arcade.gui.UIFlatButton(
+            text="Hide Names",
+            width=160,
+        )
+
+        @self.name_toggle_button.event("on_click")
+        def on_click_toggle_names(
+                event: arcade.gui.UIOnClickEvent) -> None:
+            self.toggle_hub_names(event)
+
+        try:
+            self.load_map()
+        except ValueError as e:
+            print(f"Error: {e}")
+            arcade.exit()
+            return
         self.setup_texts()
 
         self.turn_label = arcade.gui.UILabel(
@@ -110,6 +174,7 @@ class MapView(arcade.View):
             font_size=16,
             text_color=arcade.color.WHITE,
         )
+        self.update_hub_capacity_texts()
 
         bottom_box = arcade.gui.UIBoxLayout(
             vertical=False,
@@ -117,6 +182,8 @@ class MapView(arcade.View):
         )
         if self.turn_label:
             bottom_box.add(self.turn_label)
+        if self.play_button:
+            bottom_box.add(self.play_button)
         bottom_box.add(next_button)
 
         self.anchor.add(
@@ -143,15 +210,90 @@ class MapView(arcade.View):
             align_y=-20,
         )
 
+        if self.name_toggle_button:
+            self.anchor.add(
+                child=self.name_toggle_button,
+                anchor_x="right",
+                anchor_y="top",
+                align_x=-20,
+                align_y=-90,
+            )
+
     def quit_game(self, event: arcade.gui.UIOnClickEvent) -> None:
+        '''Exit the Arcade application.
+
+        Args:
+            event (arcade.gui.UIOnClickEvent): Button click event.
+
+        Returns:
+            None
+        '''
         arcade.exit()
 
+    def toggle_hub_names(self, event: arcade.gui.UIOnClickEvent) -> None:
+        '''Toggle visibility of hub name labels.
+
+        Args:
+            event (arcade.gui.UIOnClickEvent): Button click event.
+
+        Returns:
+            None
+        '''
+        self.show_hub_names = not self.show_hub_names
+        if self.name_toggle_button:
+            if self.show_hub_names:
+                self.name_toggle_button.text = "Hide Names"
+            else:
+                self.name_toggle_button.text = "Show Names"
+
+    def toggle_autoplay(self, event: arcade.gui.UIOnClickEvent) -> None:
+        '''Enable or pause automatic turn playback.
+
+        Args:
+            event (arcade.gui.UIOnClickEvent): Button click event.
+
+        Returns:
+            None
+        '''
+        self.autoplay_enabled = not self.autoplay_enabled
+
+        if self.play_button:
+            if self.autoplay_enabled:
+                self.play_button.text = "Pause"
+            else:
+                self.play_button.text = "Play"
+
+        if self.autoplay_enabled and not self.turn_animating:
+            if self.current_turn < self.max_turn:
+                self.target_turn = self.current_turn + 1
+                self.turn_progress = 0.0
+                self.turn_animating = True
+
     def on_hide_view(self) -> None:
+        '''Disable the UI manager when the view is hidden.
+
+        Returns:
+            None
+        '''
         self.ui.disable()
 
     def load_map(self) -> None:
+        '''Parse the map, plan drone routes, and prepare render data.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If the map cannot be parsed successfully.
+        '''
         parser = MapParser(self.map_path)
-        self.parsed_data = parser.parse()
+
+        try:
+            self.parsed_data = parser.parse()
+        except ValueError as e:
+            raise ValueError(
+                f"Failed to parse map '{self.map_path.name}': {e}"
+            ) from e
 
         # Type guard for mypy indexing
         if self.parsed_data is not None:
@@ -178,10 +320,14 @@ class MapView(arcade.View):
 
         self.build_hub_sprites()
         self.build_drone_sprites()
-        self.refresh_turn_label()
         self.update_drone_positions_static()
 
     def setup_texts(self) -> None:
+        '''Create the static header and label text objects for the view.
+
+        Returns:
+            None
+        '''
         self.text_objects["map"] = arcade.Text(
             f"MAP: {self.map_name}",
             160,
@@ -212,6 +358,14 @@ class MapView(arcade.View):
         self.text_objects["hub_zone"] = []
 
     def get_color_from_string(self, color_str: str) -> Any:
+        '''Convert a map color string into an Arcade color value.
+
+        Args:
+            color_str (str): Named color or hex string.
+
+        Returns:
+            Any: Parsed Arcade color, or a fallback gray color.
+        '''
         if not color_str:
             return None
 
@@ -219,7 +373,7 @@ class MapView(arcade.View):
         if color_str.startswith("#"):
             try:
                 # Fix: arcade uses color_from_hex_string
-                return arcade.color_from_hex_string(color_str)
+                return arcade.types.Color.from_hex_string(color_str)
             except (ValueError, AttributeError):
                 return arcade.color.GRAY
         try:
@@ -228,29 +382,34 @@ class MapView(arcade.View):
             return arcade.color.GRAY
 
     def get_hub_color(self, hub: Hub) -> Any:
+        '''Resolve the display color for a hub.
+
+        Args:
+            hub (Hub): Hub whose display color will be determined.
+
+        Returns:
+            Any: Arcade color used for the hub marker.
+        '''
         if hub.color:
             return self.get_color_from_string(hub.color)
         if hub.is_start:
             return arcade.color.GREEN
         if hub.is_end:
             return arcade.color.RED
-
-        zone = str(hub.zone_type).lower()
-        if "high" in zone:
-            return arcade.color.ORANGE
-        if "medium" in zone:
-            return arcade.color.BLUE
-        if "low" in zone:
-            return arcade.color.SKY_BLUE
-
         return arcade.color.GRAY
 
     def build_hub_sprites(self) -> None:
+        '''Build sprites and text labels used to render hubs.
+
+        Returns:
+            None
+        '''
         self.hub_sprites = arcade.SpriteList()
         self.hub_markers = arcade.SpriteList()
         self.hub_name_texts = []
 
-        marker_texture = arcade.make_circle_texture(30, arcade.color.WHITE)
+        marker_texture = arcade.make_soft_square_texture(
+            30, arcade.color.WHITE)
 
         for name, hub in self.hubs.items():
             x, y = self.hub_screen_positions[name]
@@ -263,13 +422,11 @@ class MapView(arcade.View):
                 scale=self.get_hub_scale()
             )
             self.hub_sprites.append(island_sprite)
-            marker_sprite = arcade.Sprite(
-                marker_texture,
-                scale=(10 * s) / marker_texture.width
-            )
-            offset_val = 12 * s
-            marker_sprite.center_x = x + offset_val
-            marker_sprite.center_y = y + offset_val
+            marker_sprite = arcade.Sprite(marker_texture)
+            marker_sprite.center_x = x
+            marker_sprite.center_y = y
+            marker_sprite.width = 14 * s
+            marker_sprite.height = 10 * s
             marker_sprite.color = self.get_hub_color(hub)
             marker_sprite.alpha = 200
             self.hub_markers.append(marker_sprite)
@@ -288,6 +445,11 @@ class MapView(arcade.View):
             self.hub_name_texts.append(name_text)
 
     def compute_scale(self) -> None:
+        '''Compute map scaling and offsets to fit hubs inside the window.
+
+        Returns:
+            None
+        '''
         if not self.hubs:
             return
 
@@ -314,6 +476,14 @@ class MapView(arcade.View):
         self.offset_y = (self.window.height - actual_map_h) / 2
 
     def get_hub_capacity_labels(self, turn: int) -> Dict[str, str]:
+        '''Generate occupancy labels for each hub at a given turn.
+
+        Args:
+            turn (int): Simulation turn to inspect.
+
+        Returns:
+            Dict[str, str]: Mapping from hub names to occupancy labels.
+        '''
         occupancy = {name: 0 for name in self.hubs}
 
         for drone in self.drones:
@@ -333,6 +503,11 @@ class MapView(arcade.View):
         return labels
 
     def update_hub_capacity_texts(self) -> None:
+        '''Refresh hub capacity and zone labels for the current turn.
+
+        Returns:
+            None
+        '''
         self.text_objects["hub_capacity"] = []
         self.text_objects["hub_zone"] = []
 
@@ -356,7 +531,14 @@ class MapView(arcade.View):
                 )
                 self.text_objects["hub_capacity"].append(capacity_label)
 
-            zone_text = str(hub.zone_type).split(".")[-1].upper()
+            zone_name = str(hub.zone_type).split(".")[-1].lower()
+            zone_map = {
+                "normal": "N",
+                "restricted": "REST",
+                "blocked": "BLO",
+                "priority": "PRIO",
+            }
+            zone_text = zone_map.get(zone_name, zone_name.upper())
             zone_label = arcade.Text(
                 zone_text,
                 x + (18 * s),
@@ -371,15 +553,37 @@ class MapView(arcade.View):
     def transform_position(self,
                            x: float | int,
                            y: float | int) -> Tuple[float, float]:
+        '''Transform map coordinates into screen coordinates.
+
+        Args:
+            x (float | int): Map x coordinate.
+            y (float | int): Map y coordinate.
+
+        Returns:
+            Tuple[float, float]: Screen position for rendering.
+        '''
         screen_x = self.offset_x + (int(x) - self.min_x) * self.scale
         screen_y = self.offset_y + (int(y) - self.min_y) * self.scale
         return float(screen_x), float(screen_y)
 
     def go_back(self, event: arcade.gui.UIOnClickEvent) -> None:
+        '''Return to the welcome view.
+
+        Args:
+            event (arcade.gui.UIOnClickEvent): Button click event.
+
+        Returns:
+            None
+        '''
         from welcomepage import WelcomeView
         self.window.show_view(WelcomeView())
 
     def on_draw(self) -> None:
+        '''Draw the full map view, including UI, hubs, and drones.
+
+        Returns:
+            None
+        '''
         self.clear()
         arcade.draw_texture_rect(
             self.background,
@@ -392,21 +596,35 @@ class MapView(arcade.View):
         )
         self.draw_connections()
         self.draw_hubs()
-        for text in self.hub_name_texts:
-            text.draw()
+        if self.show_hub_names:
+            for text in self.hub_name_texts:
+                text.draw()
         self.drone_sprites.draw()
         self.draw_header()
         self.ui.draw()
 
     def draw_header(self) -> None:
+        '''Draw header statistics and hub-related text labels.
+
+        Returns:
+            None
+        '''
         for key in ("map", "drones", "stats"):
             self.text_objects[key].draw()
+        if (not self.text_objects["hub_capacity"]
+                and not self.text_objects["hub_zone"]):
+            self.update_hub_capacity_texts()
         for label in self.text_objects["hub_capacity"]:
             label.draw()
         for label in self.text_objects["hub_zone"]:
             label.draw()
 
     def get_hub_display_size(self) -> float:
+        '''Calculate the display size of hubs based on map density.
+
+        Returns:
+            float: Render size used for hub visuals.
+        '''
         hub_count = len(self.hubs)
         if hub_count == 0:
             return 28.0
@@ -414,6 +632,11 @@ class MapView(arcade.View):
         return float(min(max(base_size, 28), 80))
 
     def get_connection_offset(self) -> float:
+        '''Return the visual offset used to shorten connection lines.
+
+        Returns:
+            float: Offset distance from hub centers.
+        '''
         return self.get_hub_display_size() * 0.45
 
     def get_connection_endpoints(
@@ -424,6 +647,18 @@ class MapView(arcade.View):
         y2: float,
         offset: float
     ) -> Tuple[float, float, float, float]:
+        '''Compute shortened line endpoints between two hubs.
+
+        Args:
+            x1 (float): First hub x coordinate.
+            y1 (float): First hub y coordinate.
+            x2 (float): Second hub x coordinate.
+            y2 (float): Second hub y coordinate.
+            offset (float): Distance to trim from both ends.
+
+        Returns:
+            Tuple[float, float, float, float]: Adjusted line endpoints.
+        '''
         dx = x2 - x1
         dy = y2 - y1
         distance = math.hypot(dx, dy)
@@ -437,6 +672,11 @@ class MapView(arcade.View):
                 y2 - uy * offset)
 
     def draw_connections(self) -> None:
+        '''Draw all map connections and restricted-zone markers.
+
+        Returns:
+            None
+        '''
         offset = self.get_connection_offset()
         for conn in self.connections:
             x1, y1 = self.hub_screen_positions[conn.source.name]
@@ -464,10 +704,20 @@ class MapView(arcade.View):
                     mid_x, mid_y, 10 * s, 7 * s, arcade.color.GOLD)
 
     def draw_hubs(self) -> None:
+        '''Draw all hub sprites and hub markers.
+
+        Returns:
+            None
+        '''
         self.hub_sprites.draw()
         self.hub_markers.draw()
 
     def get_finished_turn(self) -> int:
+        '''Return the last turn required by any drone route.
+
+        Returns:
+            int: Final completed turn index across all drones.
+        '''
         if not self.drones:
             return 0
         max_t = 0
@@ -477,13 +727,34 @@ class MapView(arcade.View):
         return max_t
 
     def on_next_turn(self, event: arcade.gui.UIOnClickEvent) -> None:
+        '''Advance the animation by one turn if possible.
+
+        Args:
+            event (arcade.gui.UIOnClickEvent): Button click event.
+
+        Returns:
+            None
+        '''
+        self.autoplay_enabled = False
+        if self.play_button:
+            self.play_button.text = "Play"
+
         if self.turn_animating or self.current_turn >= self.max_turn:
             return
+
         self.target_turn = self.current_turn + 1
         self.turn_progress = 0.0
         self.turn_animating = True
 
     def on_update(self, delta_time: float) -> None:
+        '''Update animation state and autoplay progression.
+
+        Args:
+            delta_time (float): Time elapsed since the last frame.
+
+        Returns:
+            None
+        '''
         if not self.turn_animating:
             return
         self.turn_progress += delta_time / self.turn_animation_duration
@@ -496,10 +767,25 @@ class MapView(arcade.View):
             self.update_drone_positions_static()
             self.refresh_turn_label()
             self.update_hub_capacity_texts()
+
+            if self.autoplay_enabled:
+                if self.current_turn < self.max_turn:
+                    self.target_turn = self.current_turn + 1
+                    self.turn_progress = 0.0
+                    self.turn_animating = True
+                else:
+                    self.autoplay_enabled = False
+                    if self.play_button:
+                        self.play_button.text = "Play"
             return
         self.update_drone_positions_for_animation()
 
     def update_drone_positions_static(self) -> None:
+        '''Place drones at their exact positions for the current turn.
+
+        Returns:
+            None
+        '''
         for drone in self.drones:
             sprite = self.drone_sprite_map[drone.drone_id]
             state = self.get_drone_state_at_turn(drone, self.current_turn)
@@ -507,6 +793,11 @@ class MapView(arcade.View):
             sprite.center_x, sprite.center_y = x, y
 
     def update_drone_positions_for_animation(self) -> None:
+        '''Interpolate drone positions between the current and target turns.
+
+        Returns:
+            None
+        '''
         for drone in self.drones:
             sprite = self.drone_sprite_map[drone.drone_id]
             start_state = self.get_drone_state_at_turn(
@@ -518,23 +809,55 @@ class MapView(arcade.View):
             sprite.center_x, sprite.center_y = x, y
 
     def get_drone_state_at_turn(self, drone: Drone, turn: int) -> str:
+        '''Return the drone state string for a specific turn.
+
+        Args:
+            drone (Drone): Drone whose route will be inspected.
+            turn (int): Simulation turn.
+
+        Returns:
+            str: Hub name or connection label for that turn.
+        '''
         if not drone.route:
             return str(self.start_hub.name)
-        return (
-            drone.route[turn] if turn < len(drone.route) else drone.route[-1])
+        if turn < len(drone.route):
+            return str(drone.route[turn])
+        return str(drone.route[-1])
 
     def get_interpolated_position(
         self, start_state: str, end_state: str, progress: float
     ) -> Tuple[float, float]:
+        '''Interpolate between two drone states for smooth animation.
+
+        Args:
+            start_state (str): State at animation start.
+            end_state (str): State at animation end.
+            progress (float): Normalized animation progress from 0 to 1.
+
+        Returns:
+            Tuple[float, float]: Interpolated screen position.
+        '''
         x1, y1 = self.get_state_position(start_state)
         x2, y2 = self.get_state_position(end_state)
         return x1 + (x2 - x1) * progress, y1 + (y2 - y1) * progress
 
     def refresh_turn_label(self) -> None:
+        '''Refresh the visible turn counter label.
+
+        Returns:
+            None
+        '''
         if self.turn_label:
-            self.turn_label.text = f"TURN {self.current_turn}"
+            self.turn_label.text = (
+                f"TURN {self.current_turn} / {self.max_turn}"
+            )
 
     def build_drone_sprites(self) -> None:
+        '''Create sprite objects for all drones.
+
+        Returns:
+            None
+        '''
         self.drone_sprites = arcade.SpriteList()
         self.drone_sprite_map = {}
         drone_texture = arcade.make_circle_texture(20, arcade.color.WHITE)
@@ -545,6 +868,14 @@ class MapView(arcade.View):
             self.drone_sprite_map[drone.drone_id] = sprite
 
     def get_state_position(self, state: str) -> Tuple[float, float]:
+        '''Resolve the screen position of a hub state or connection state.
+
+        Args:
+            state (str): Hub name or connection label in source->target form.
+
+        Returns:
+            Tuple[float, float]: Screen position used for rendering.
+        '''
         if "->" in state:
             src, tgt = state.split("->", 1)
             x1, y1 = self.hub_screen_positions[src]

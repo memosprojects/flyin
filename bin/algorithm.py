@@ -11,13 +11,19 @@ class PlanResult:
     total_cost: int
 
 
-# Type aliases for readability
+# Type aliases for state and move representations
 State = tuple[str, int, str | None]
 Move = tuple[str, str, int, int]
 
 
 class DronePlanner:
     def __init__(self, parsed_data: dict[str, Any]):
+        '''Initialize the DronePlanner.
+
+        Args:
+            parsed_data (dict[str, Any]):
+            Parsed map data including hubs, connections, and drone count.
+        '''
         self.parsed_data = parsed_data
 
         self.drone_count: int = parsed_data["drone_count"]
@@ -38,18 +44,40 @@ class DronePlanner:
         self.debug: bool = True
 
     def _find_start_hub(self) -> Hub:
+        '''Find the start hub in the map.
+
+        Returns:
+            Hub: The hub marked as start.
+
+        Raises:
+            ValueError: If no start hub is found.
+        '''
         for hub in self.hubs.values():
             if hub.is_start:
                 return hub
         raise ValueError("Start hub not found.")
 
     def _find_end_hub(self) -> Hub:
+        '''Find the end hub in the map.
+
+        Returns:
+            Hub: The hub marked as end.
+
+        Raises:
+            ValueError: If no end hub is found.
+        '''
         for hub in self.hubs.values():
             if hub.is_end:
                 return hub
         raise ValueError("End hub not found.")
 
     def _build_connection_map(self) -> dict[tuple[str, str], Connection]:
+        '''Create a lookup map for connections.
+
+        Returns:
+            dict[tuple[str, str], Connection]:
+            Mapping of edge IDs to connection objects.
+        '''
         connection_map: dict[tuple[str, str], Connection] = {}
 
         for conn in self.connections:
@@ -58,6 +86,11 @@ class DronePlanner:
         return connection_map
 
     def _create_drones(self) -> list[Drone]:
+        '''Create drone instances for the simulation.
+
+        Returns:
+            list[Drone]: List of initialized drones.
+        '''
         drones: list[Drone] = []
 
         for drone_id in range(1, self.drone_count + 1):
@@ -69,6 +102,18 @@ class DronePlanner:
         return drones
 
     def _get_connection(self, a: str, b: str) -> Connection:
+        '''Retrieve a connection between two hubs.
+
+        Args:
+            a (str): Source hub name.
+            b (str): Target hub name.
+
+        Returns:
+            Connection: Connection object between hubs.
+
+        Raises:
+            ValueError: If connection does not exist.
+        '''
         edge_id: tuple[str, str] = tuple(sorted((a, b)))  # type: ignore
 
         if edge_id not in self.connection_map:
@@ -76,16 +121,58 @@ class DronePlanner:
 
         return self.connection_map[edge_id]
 
+    def _get_connection_label(self, a: str, b: str) -> str:
+        '''Get a printable label for a connection.
+
+        Args:
+            a (str): Source hub name.
+            b (str): Target hub name.
+
+        Returns:
+            str: Human-readable connection label.
+        '''
+        conn = self._get_connection(a, b)
+
+        if hasattr(conn, "name"):
+            conn_name = getattr(conn, "name")
+            if isinstance(conn_name, str) and conn_name:
+                return conn_name
+
+        if hasattr(conn, "label"):
+            conn_label = getattr(conn, "label")
+            if isinstance(conn_label, str) and conn_label:
+                return conn_label
+
+        return f"{a}->{b}"
+
     def _hub_capacity_ok(self, hub_name: str, turn: int) -> bool:
+        '''Check if a hub has available capacity.
+
+        Args:
+            hub_name (str): Name of the hub.
+            turn (int): Simulation turn.
+
+        Returns:
+            bool: True if capacity allows entry, False otherwise.
+        '''
         hub = self.hubs[hub_name]
 
         if hub.is_start or hub.is_end:
             return True
 
         used: int = self.hub_usage.get(turn, {}).get(hub_name, 0)
-        return used < hub.max_drones
+        return used < int(hub.max_drones)
 
     def _can_wait(self, hub_name: str, next_turn: int) -> bool:
+        '''Check if a drone can wait at a hub.
+
+        Args:
+            hub_name (str): Name of the hub.
+            next_turn (int): Next simulation turn.
+
+        Returns:
+            bool: True if waiting is allowed.
+        '''
         return self._hub_capacity_ok(hub_name, next_turn)
 
     def _edge_capacity_ok_for_interval(
@@ -95,6 +182,17 @@ class DronePlanner:
         start_turn: int,
         duration: int,
     ) -> bool:
+        '''Check edge capacity across a time interval.
+
+        Args:
+            source_name (str): Source hub.
+            target_name (str): Target hub.
+            start_turn (int): Starting turn.
+            duration (int): Travel duration.
+
+        Returns:
+            bool: True if edge capacity is sufficient.
+        '''
         conn = self._get_connection(source_name, target_name)
         edge_id = conn.edge_id
 
@@ -112,6 +210,16 @@ class DronePlanner:
         target_name: str,
         current_turn: int,
     ) -> tuple[bool, int]:
+        '''Check if a drone can move to a target hub.
+
+        Args:
+            source_name (str): Current hub.
+            target_name (str): Destination hub.
+            current_turn (int): Current turn.
+
+        Returns:
+            tuple[bool, int]: (allowed, arrival_turn).
+        '''
         target_hub = self.hubs[target_name]
 
         if target_hub.is_blocked:
@@ -139,6 +247,16 @@ class DronePlanner:
         current_turn: int,
         previous_hub: str | None,
     ) -> list[tuple[int, int, State, list[str], Move | None]]:
+        '''Generate valid next states from current state.
+
+        Args:
+            hub_name (str): Current hub.
+            current_turn (int): Current turn.
+            previous_hub (str | None): Previously visited hub.
+
+        Returns:
+            list: List of neighbor state transitions.
+        '''
         neighbors: list[tuple[int, int, State, list[str], Move | None]] = []
 
         next_turn = current_turn + 1
@@ -172,11 +290,12 @@ class DronePlanner:
 
             duration = arrival_turn - current_turn
             priority_gain = 1 if neighbor.is_priority else 0
+            conn_label = self._get_connection_label(hub_name, neighbor.name)
 
             if duration == 1:
                 segment = [neighbor.name]
             else:
-                segment = [f"{hub_name}->{neighbor.name}", neighbor.name]
+                segment = [conn_label, neighbor.name]
 
             move_record: Move = (
                 hub_name,
@@ -210,6 +329,20 @@ class DronePlanner:
         previous_hub: str | None,
         target_hub_name: str,
     ) -> PlanResult:
+        '''Compute a route to the target hub.
+
+        Args:
+            start_hub_name (str): Starting hub.
+            start_turn (int): Initial turn.
+            previous_hub (str | None): Previous hub.
+            target_hub_name (str): Destination hub.
+
+        Returns:
+            PlanResult: Computed plan including timeline and moves.
+
+        Raises:
+            ValueError: If no path is found.
+        '''
         start_state: State = (start_hub_name, start_turn, previous_hub)
 
         open_states: list[State] = [start_state]
@@ -272,6 +405,18 @@ class DronePlanner:
         segment_map: dict[State, list[str]],
         move_map: dict[State, Move | None],
     ) -> PlanResult:
+        '''Reconstruct plan from search results.
+
+        Args:
+            end_state (State): Final state.
+            total_cost (int): Total path cost.
+            parent (dict): Parent mapping.
+            segment_map (dict): Segment mapping.
+            move_map (dict): Move mapping.
+
+        Returns:
+            PlanResult: Reconstructed plan.
+        '''
         segments: list[list[str]] = []
         moves: list[Move] = []
 
@@ -302,6 +447,11 @@ class DronePlanner:
         )
 
     def _reserve_plan(self, plan: PlanResult) -> None:
+        '''Reserve resources for a planned route.
+
+        Args:
+            plan (PlanResult): Plan to reserve.
+        '''
         for turn, state in enumerate(plan.timeline):
             if "->" in state:
                 continue
@@ -334,6 +484,11 @@ class DronePlanner:
                 self.edge_usage[used_turn][edge_id] += 1
 
     def plan_all_drones(self) -> list[Drone]:
+        '''Plan routes for all drones.
+
+        Returns:
+            list[Drone]: Drones with assigned routes.
+        '''
         for drone in self.drones:
             plan = self.plan_to_target(
                 self.start_hub.name,
@@ -350,6 +505,11 @@ class DronePlanner:
         return self.drones
 
     def print_simulation(self) -> None:
+        '''Print simulation results turn by turn.
+
+        Returns:
+            None
+        '''
         if not self.drones:
             return
 

@@ -2,14 +2,15 @@ from welcomepage import WelcomeView
 import arcade
 
 
-def main():
-    SCREEN_WIDTH = 1920
-    SCREEN_HEIGHT = 960
+def main() -> None:
+    SCREEN_WIDTH = 1280
+    SCREEN_HEIGHT = 780
     SCREEN_TITLE = "Flyin - Welcome"
 
     window = arcade.Window(
         SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, fullscreen=False
     )
+
     welcome_view = WelcomeView()
     window.show_view(welcome_view)
     arcade.run()
