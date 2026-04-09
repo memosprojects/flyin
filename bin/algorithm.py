@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
-from Units import Drone, Hub, Connection
+from .units import Drone, Hub, Connection
 
 
 @dataclass

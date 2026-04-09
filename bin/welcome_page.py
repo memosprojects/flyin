@@ -3,8 +3,8 @@ import arcade.gui
 from pathlib import Path
 from typing import TypedDict
 from arcade.gui import NinePatchTexture, UIView
-from MapManager import MapFolderManager
-from mappage import MapView
+from .map_manager import MapFolderManager
+from .map_page import MapView
 
 
 class MapInfo(TypedDict):

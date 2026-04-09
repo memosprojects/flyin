@@ -9,14 +9,14 @@ PIP = $(BIN)/python -m pip
 
 install:
 	@test -d $(VENV) || $(PYTHON) -m venv $(VENV)
-	$(PIP) install --upgrade pip
-	$(PIP) install arcade pydantic flake8 mypy
+	$(PIP) install --upgrade pip setuptools
+	$(PIP) install -r requirements.txt
 
 run: install
-	$(BIN)/python bin/main.py
+	$(BIN)/python -m bin.main
 
 debug: install
-	$(BIN)/python -m pdb bin/main.py
+	$(BIN)/python -m pdb -c continue -m bin.main
 
 clean:
 	find . -type d -name "__pycache__" -not -path "./$(VENV)/*" -exec rm -rf {} +

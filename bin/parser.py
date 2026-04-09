@@ -1,5 +1,5 @@
 from pathlib import Path
-from Units import Hub, Connection
+from .units import Hub, Connection
 from typing import Any
 
 

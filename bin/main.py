@@ -1,4 +1,4 @@
-from welcomepage import WelcomeView
+from .welcome_page import WelcomeView
 import arcade
 
 
@@ -8,7 +8,7 @@ def main() -> None:
     SCREEN_TITLE = "Flyin - Welcome"
 
     window = arcade.Window(
-        SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, fullscreen=False
+        SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, fullscreen=True
     )
 
     welcome_view = WelcomeView()

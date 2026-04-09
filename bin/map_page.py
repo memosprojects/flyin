@@ -4,9 +4,9 @@ from pathlib import Path
 import math
 from typing import Any, Dict, List, Tuple, Optional
 
-from parser import MapParser
-from algorithm import DronePlanner
-from Units import Drone, Hub, Connection
+from .parser import MapParser
+from .algorithm import DronePlanner
+from .units import Drone, Hub, Connection
 
 
 class MapView(arcade.View):
@@ -575,7 +575,7 @@ class MapView(arcade.View):
         Returns:
             None
         '''
-        from welcomepage import WelcomeView
+        from .welcome_page import WelcomeView
         self.window.show_view(WelcomeView())
 
     def on_draw(self) -> None:
