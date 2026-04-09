@@ -1,6 +1,7 @@
 from pathlib import Path
 from .units import Hub, Connection
 from typing import Any
+from pydantic import ValidationError
 
 
 class MapParser:
@@ -141,11 +142,18 @@ class MapParser:
         '''
         data = self._hub_data_extractor(line, line_no)
         h_type = data.pop("type")
-        hub = Hub(
-            is_start=(h_type == "start_hub"),
-            is_end=(h_type == "end_hub"),
-            **data  # name, x, y ve metadata verileri burada
-        )
+        try:
+            hub = Hub(
+                is_start=(h_type == "start_hub"),
+                is_end=(h_type == "end_hub"),
+                **data
+            )
+        except ValidationError as e:
+            raise ValueError(
+                f"Line {line_no}: Invalid hub definition."
+                f" {e.errors()[0]['msg']}"
+            ) from e
+
         if hub.name in self.hubs:
             raise ValueError(
                 f"Line {line_no}: Duplicate hub name: '{hub.name}'."
@@ -187,11 +195,17 @@ class MapParser:
                 f"'{source_name}-{target_name}'."
             )
 
-        connection = Connection(
-            source=self.hubs[source_name],
-            target=self.hubs[target_name],
-            max_link_capacity=data["max_link_capacity"]
-        )
+        try:
+            connection = Connection(
+                source=self.hubs[source_name],
+                target=self.hubs[target_name],
+                max_link_capacity=data["max_link_capacity"]
+            )
+        except ValidationError as e:
+            raise ValueError(
+                f"Line {line_no}: Invalid hub definition."
+                f" {e.errors()[0]['msg']}"
+            ) from e
         self.connections.append(connection)
         self._seen_connections.add(edge_id)
 

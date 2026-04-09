@@ -1,7 +1,7 @@
 """
 Flyin: A drone routing and simulation engine.
 
-This package contains the core logic for parsing maps, planning multi-agent 
+This package contains the core logic for parsing maps, planning multi-agent
 drone routes, and managing simulation assets.
 """
 
